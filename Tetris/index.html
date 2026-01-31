@@ -4,1077 +4,468 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>俄罗斯方块</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
+
         body {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
-            min-height: 100vh;
+            /* 低饱和度渐变背景，柔和不刺眼 */
+            background: linear-gradient(135deg, #6b7c9f, #a78ca3, #e6d5b8);
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            padding: 20px;
-            overflow-x: hidden;
+            min-height: 100vh;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background-attachment: fixed;
         }
-        
-        header {
-            text-align: center;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 800px;
-        }
-        
-        h1 {
-            font-size: 2.8rem;
-            margin-bottom: 5px;
-            color: #4cc9f0;
-            text-shadow: 0 0 10px rgba(76, 201, 240, 0.7);
-            letter-spacing: 2px;
-        }
-        
-        .subtitle {
-            color: #a9a9a9;
-            font-size: 1.2rem;
-            margin-bottom: 15px;
-        }
-        
+
         .game-container {
+            position: relative;
+            padding: 20px;
+            /* 低饱和浅灰背景，替代纯白，更柔和 */
+            background-color: #f5f5f5;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
             display: flex;
             flex-wrap: wrap;
+            gap: 20px;
             justify-content: center;
-            gap: 30px;
-            max-width: 1000px;
-            margin: 0 auto;
+            align-items: flex-start;
         }
-        
-        .game-board {
-            position: relative;
-            width: 300px;
-            height: 600px;
-            background-color: rgba(0, 0, 0, 0.7);
-            border: 3px solid #4cc9f0;
-            border-radius: 5px;
-            box-shadow: 0 0 20px rgba(76, 201, 240, 0.3);
-            overflow: hidden;
+
+        #tetris {
+            border: 3px solid #555555;
+            /* 低饱和深灰渐变，替代纯黑，视觉更舒缓 */
+            background: linear-gradient(180deg, #222222, #333333);
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         }
-        
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-        
-        .side-panel {
+
+        .game-info {
+            position: static;
+            width: 160px;
+            padding: 15px;
+            /* 低饱和浅灰背景，提升柔和度 */
+            background-color: #f0f0f0;
+            border: 2px solid #555555;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            width: 300px;
+            gap: 12px;
         }
-        
-        .info-panel {
-            background-color: rgba(0, 0, 0, 0.7);
-            border: 2px solid #4361ee;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 0 15px rgba(67, 97, 238, 0.3);
-        }
-        
-        .panel-title {
-            font-size: 1.5rem;
-            color: #4361ee;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .panel-title i {
-            font-size: 1.3rem;
-        }
-        
-        .score-display {
-            font-size: 2.2rem;
+
+        .game-info .info-title {
+            font-size: 18px;
+            font-weight: bold;
+            /* 低饱和深灰文字，替代纯黑 */
+            color: #444444;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 8px;
             text-align: center;
+        }
+
+        .game-info .score-item {
+            font-size: 16px;
+            /* 低饱和红棕，替代高饱和红色，醒目且不刺眼 */
+            color: #9c4a50;
             font-weight: bold;
-            color: #f72585;
-            margin-bottom: 10px;
-            text-shadow: 0 0 8px rgba(247, 37, 133, 0.5);
-        }
-        
-        .level-display, .lines-display {
-            font-size: 1.3rem;
-            margin-bottom: 10px;
-            color: #b5e48c;
-        }
-        
-        .next-piece-container {
-            height: 150px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-        
-        #next-piece {
-            width: 120px;
-            height: 120px;
-        }
-        
-        .controls {
-            margin-top: 15px;
-        }
-        
-        .control-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            padding: 8px 10px;
-            background-color: rgba(255, 255, 255, 0.05);
-            border-radius: 5px;
-        }
-        
-        .key {
-            display: inline-block;
-            background-color: #333;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-weight: bold;
-            min-width: 40px;
             text-align: center;
-            border: 1px solid #555;
+            padding: 8px 0;
+            background-color: #fafafa;
+            border-radius: 4px;
+            border: 1px solid #eee;
         }
-        
-        .buttons {
-            display: flex;
-            gap: 15px;
-            margin-top: 20px;
-        }
-        
-        button {
-            flex: 1;
-            padding: 12px 0;
-            background: linear-gradient(to bottom, #4361ee, #3a0ca3);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.1rem;
+
+        .game-info .ops-title {
+            font-size: 15px;
             font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            color: #555555;
+            margin-top: 8px;
         }
-        
-        button:hover {
-            background: linear-gradient(to bottom, #4895ef, #4361ee);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+
+        .game-info .ops-item {
+            font-size: 14px;
+            color: #666666;
+            line-height: 1.6;
         }
-        
-        button:active {
-            transform: translateY(1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }
-        
-        button#pause-btn {
-            background: linear-gradient(to bottom, #f8961e, #f3722c);
-        }
-        
-        button#pause-btn:hover {
-            background: linear-gradient(to bottom, #f9c74f, #f8961e);
-        }
-        
-        button#restart-btn {
-            background: linear-gradient(to bottom, #ef233c, #d90429);
-        }
-        
-        button#restart-btn:hover {
-            background: linear-gradient(to bottom, #f72585, #ef233c);
-        }
-        
-        .game-status {
-            font-size: 1.4rem;
-            text-align: center;
-            padding: 10px;
-            margin-top: 15px;
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 8px;
-            color: #4cc9f0;
-            font-weight: bold;
-            min-height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .mobile-controls {
-            display: none;
-            margin-top: 25px;
+
+        .game-tips {
+            position: static;
             width: 100%;
-            max-width: 300px;
-        }
-        
-        .mobile-controls .row {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 15px;
-        }
-        
-        .mobile-btn {
-            width: 70px;
-            height: 70px;
-            margin: 0 10px;
-            background-color: rgba(67, 97, 238, 0.8);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.8rem;
-            color: white;
-            cursor: pointer;
-            user-select: none;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-        }
-        
-        .mobile-btn:active {
-            background-color: rgba(76, 201, 240, 0.8);
-            transform: scale(0.95);
-        }
-        
-        .mobile-btn.rotate {
-            background-color: rgba(247, 37, 133, 0.8);
-        }
-        
-        footer {
-            margin-top: 30px;
             text-align: center;
-            color: #a9a9a9;
-            font-size: 0.9rem;
+            font-size: 13px;
+            /* 低饱和灰蓝文字，替代深灰 */
+            color: #718096;
+            /* 低饱和浅蓝背景，更柔和 */
+            background-color: #f8fafc;
+            border-radius: 4px;
             padding: 10px;
-            width: 100%;
-            max-width: 800px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 12px;
+            border: 1px solid #e2e8f0;
         }
-        
-        /* 响应式设计 */
-        @media (max-width: 768px) {
+
+        /* 媒体查询，适配移动端（屏幕宽度小于600px） */
+        @media (max-width: 600px) {
             .game-container {
-                flex-direction: column;
-                align-items: center;
+                padding: 15px;
+                margin: 0 10px;
             }
-            
-            .side-panel {
-                width: 300px;
+
+            #tetris {
+                width: 240px;
+                height: 480px;
             }
-            
-            .mobile-controls {
-                display: block;
-            }
-            
-            h1 {
-                font-size: 2.2rem;
+
+            .game-info {
+                width: 240px;
             }
         }
-        
-        @media (max-width: 480px) {
-            .game-board, .side-panel {
-                width: 280px;
-            }
-            
-            .game-board {
-                height: 560px;
-            }
-            
-            h1 {
-                font-size: 1.8rem;
-            }
-            
-            .mobile-btn {
-                width: 60px;
-                height: 60px;
-                margin: 0 8px;
-                font-size: 1.5rem;
-            }
-        }
-        
-        /* 游戏说明样式 */
-        .instructions {
-            margin-top: 25px;
-            max-width: 800px;
-            background-color: rgba(0, 0, 0, 0.7);
-            border-radius: 10px;
-            padding: 20px;
-            border: 2px solid #7209b7;
-            box-shadow: 0 0 15px rgba(114, 9, 183, 0.3);
-        }
-        
-        .instructions h2 {
-            color: #7209b7;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .instructions p {
-            margin-bottom: 10px;
-            line-height: 1.5;
-        }
-        
-        .instructions ul {
-            margin-left: 20px;
-            margin-bottom: 15px;
-        }
-        
-        .instructions li {
-            margin-bottom: 8px;
-        }
-        
-        .piece-preview {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            margin-right: 5px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .piece-preview.i { background-color: #00f5d4; }
-        .piece-preview.o { background-color: #ffbe0b; }
-        .piece-preview.t { background-color: #fb5607; }
-        .piece-preview.s { background-color: #ff006e; }
-        .piece-preview.z { background-color: #8338ec; }
-        .piece-preview.j { background-color: #3a86ff; }
-        .piece-preview.l { background-color: #06d6a0; }
     </style>
 </head>
 <body>
-    <header>
-        <h1><i class="fas fa-gamepad"></i> 俄罗斯方块</h1>
-        <p class="subtitle">经典益智游戏 - 使用键盘或触摸控制</p>
-    </header>
-    
     <div class="game-container">
-        <div class="game-board">
-            <canvas id="tetris" width="300" height="600"></canvas>
+        <canvas id="tetris" width="300" height="600"></canvas>
+        <div class="game-info">
+            <div class="info-title">游戏信息</div>
+            <div class="score-item">分数: <span id="score">0</span></div>
+            <div class="ops-title">操作说明</div>
+            <!-- 关键修改：更新操作说明为WASD -->
+            <div class="ops-item">A / D: 左右移动</div>
+            <div class="ops-item">W: 旋转方块</div>
+            <div class="ops-item">S: 加速下落</div>
         </div>
-        
-        <div class="side-panel">
-            <div class="info-panel">
-                <div class="panel-title"><i class="fas fa-chart-line"></i> 游戏信息</div>
-                <div class="score-display" id="score">0</div>
-                <div class="level-display">等级: <span id="level">1</span></div>
-                <div class="lines-display">消除行数: <span id="lines">0</span></div>
-                
-                <div class="panel-title" style="margin-top: 20px;"><i class="fas fa-shapes"></i> 下一个方块</div>
-                <div class="next-piece-container">
-                    <canvas id="next-piece" width="120" height="120"></canvas>
-                </div>
-                
-                <div class="game-status" id="game-status">准备开始</div>
-                
-                <div class="buttons">
-                    <button id="start-btn"><i class="fas fa-play"></i> 开始游戏</button>
-                    <button id="pause-btn"><i class="fas fa-pause"></i> 暂停</button>
-                    <button id="restart-btn"><i class="fas fa-redo"></i> 重新开始</button>
-                </div>
-            </div>
-            
-            <div class="info-panel">
-                <div class="panel-title"><i class="fas fa-keyboard"></i> 控制说明</div>
-                <div class="controls">
-                    <div class="control-row">
-                        <span>左移</span>
-                        <span class="key">←</span>
-                    </div>
-                    <div class="control-row">
-                        <span>右移</span>
-                        <span class="key">→</span>
-                    </div>
-                    <div class="control-row">
-                        <span>快速下落</span>
-                        <span class="key">↓</span>
-                    </div>
-                    <div class="control-row">
-                        <span>旋转</span>
-                        <span class="key">↑</span>
-                    </div>
-                    <div class="control-row">
-                        <span>直接落下</span>
-                        <span class="key">空格</span>
-                    </div>
-                    <div class="control-row">
-                        <span>暂停</span>
-                        <span class="key">P</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div class="game-tips">游戏加载完成后自动开始，一行消除得10分，方块堆满顶部则游戏结束</div>
     </div>
-    
-    <div class="mobile-controls">
-        <div class="row">
-            <div class="mobile-btn" id="mobile-left"><i class="fas fa-arrow-left"></i></div>
-            <div class="mobile-btn rotate" id="mobile-rotate"><i class="fas fa-redo"></i></div>
-            <div class="mobile-btn" id="mobile-right"><i class="fas fa-arrow-right"></i></div>
-        </div>
-        <div class="row">
-            <div class="mobile-btn" id="mobile-down"><i class="fas fa-arrow-down"></i></div>
-            <div class="mobile-btn" id="mobile-drop" style="background-color: rgba(76, 201, 240, 0.8);"><i class="fas fa-arrow-circle-down"></i></div>
-        </div>
-    </div>
-    
-    <div class="instructions">
-        <h2><i class="fas fa-info-circle"></i> 游戏规则</h2>
-        <p>俄罗斯方块是一款经典的益智游戏，玩家需要移动、旋转和放置下落的方块，使其形成完整的水平行。</p>
-        <ul>
-            <li>当一行被完全填满时，该行将被消除，您将获得分数</li>
-            <li>同时消除的行数越多，获得的分数越高</li>
-            <li>游戏会随着等级提高而加速</li>
-            <li>当方块堆叠到顶部时，游戏结束</li>
-        </ul>
-        <p><strong>方块类型：</strong> 
-            <span class="piece-preview i"></span> I型
-            <span class="piece-preview o"></span> O型
-            <span class="piece-preview t"></span> T型
-            <span class="piece-preview s"></span> S型
-            <span class="piece-preview z"></span> Z型
-            <span class="piece-preview j"></span> J型
-            <span class="piece-preview l"></span> L型
-        </p>
-    </div>
-    
-    <footer>
-        <p>俄罗斯方块游戏 &copy; 2023 | 使用 HTML5 Canvas, CSS3 和 JavaScript 实现</p>
-    </footer>
 
     <script>
-        // 游戏常量
+        // 1. 获取Canvas上下文和基础配置
+        const canvas = document.getElementById('tetris');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        // 方块大小（每个小格子的像素尺寸）
+        const BLOCK_SIZE = 30;
+        // 游戏区域尺寸（列数 x 行数）
         const COLS = 10;
         const ROWS = 20;
-        const BLOCK_SIZE = 30;
-        const COLORS = [
-            null,
-            '#00f5d4', // I型 - 青色
-            '#ffbe0b', // O型 - 黄色
-            '#fb5607', // T型 - 橙色
-            '#ff006e', // S型 - 粉色
-            '#8338ec', // Z型 - 紫色
-            '#3a86ff', // J型 - 蓝色
-            '#06d6a0'  // L型 - 绿色
-        ];
-        
-        // 方块形状定义
-        const SHAPES = [
-            null,
-            // I型
-            [
-                [0,0,0,0],
-                [1,1,1,1],
-                [0,0,0,0],
-                [0,0,0,0]
-            ],
-            // O型
-            [
-                [2,2],
-                [2,2]
-            ],
-            // T型
-            [
-                [0,3,0],
-                [3,3,3],
-                [0,0,0]
-            ],
-            // S型
-            [
-                [0,4,4],
-                [4,4,0],
-                [0,0,0]
-            ],
-            // Z型
-            [
-                [5,5,0],
-                [0,5,5],
-                [0,0,0]
-            ],
-            // J型
-            [
-                [6,0,0],
-                [6,6,6],
-                [0,0,0]
-            ],
-            // L型
-            [
-                [0,0,7],
-                [7,7,7],
-                [0,0,0]
-            ]
-        ];
-        
-        // 游戏变量
-        let canvas = document.getElementById('tetris');
-        let ctx = canvas.getContext('2d');
-        let nextCanvas = document.getElementById('next-piece');
-        let nextCtx = nextCanvas.getContext('2d');
-        let scoreElement = document.getElementById('score');
-        let levelElement = document.getElementById('level');
-        let linesElement = document.getElementById('lines');
-        let gameStatusElement = document.getElementById('game-status');
-        let startButton = document.getElementById('start-btn');
-        let pauseButton = document.getElementById('pause-btn');
-        let restartButton = document.getElementById('restart-btn');
-        
-        // 移动设备控制按钮
-        let mobileLeft = document.getElementById('mobile-left');
-        let mobileRight = document.getElementById('mobile-right');
-        let mobileDown = document.getElementById('mobile-down');
-        let mobileRotate = document.getElementById('mobile-rotate');
-        let mobileDrop = document.getElementById('mobile-drop');
-        
-        // 游戏状态
-        let board = [];
-        let score = 0;
-        let level = 1;
-        let lines = 0;
-        let gameOver = false;
-        let paused = false;
-        let dropCounter = 0;
-        let dropInterval = 1000; // 初始下落间隔（毫秒）
-        let lastTime = 0;
-        let player = {
-            pos: {x: 0, y: 0},
-            matrix: null,
-            type: null
+
+        // 2. 定义俄罗斯方块的形状和【低饱和度】颜色（经典7种形状，色调保留，饱和度降低）
+        const TETROMINOS = {
+            I: {
+                shape: [
+                    [0, 0, 0, 0],
+                    [1, 1, 1, 1],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0]
+                ],
+                color: '#99e6e6' // 低饱和青色（原#00ffff）
+            },
+            J: {
+                shape: [
+                    [1, 0, 0],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ],
+                color: '#6666cc' // 低饱和蓝色（原#0000ff）
+            },
+            L: {
+                shape: [
+                    [0, 0, 1],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ],
+                color: '#cc9966' // 低饱和橙色（原#ffa500）
+            },
+            O: {
+                shape: [
+                    [1, 1],
+                    [1, 1]
+                ],
+                color: '#e6e699' // 低饱和黄色（原#ffff00）
+            },
+            S: {
+                shape: [
+                    [0, 1, 1],
+                    [1, 1, 0],
+                    [0, 0, 0]
+                ],
+                color: '#99cc99' // 低饱和绿色（原#00ff00）
+            },
+            T: {
+                shape: [
+                    [0, 1, 0],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ],
+                color: '#996699' // 低饱和紫色（原#800080）
+            },
+            Z: {
+                shape: [
+                    [1, 1, 0],
+                    [0, 1, 1],
+                    [0, 0, 0]
+                ],
+                color: '#cc6666' // 低饱和红色（原#ff0000）
+            }
         };
-        
-        let nextPieceType = null;
-        
-        // 初始化游戏板
-        function createMatrix(width, height) {
-            const matrix = [];
-            while (height--) {
-                matrix.push(new Array(width).fill(0));
+
+        // 3. 游戏状态初始化
+        let gameBoard = []; // 游戏面板（存储已落地的方块）
+        let currentTetromino = null; // 当前下落的方块
+        let currentX = 0; // 当前方块的X坐标
+        let currentY = 0; // 当前方块的Y坐标
+        let score = 0; // 分数
+        let dropInterval = 1000; // 方块下落间隔（毫秒）
+        let dropTimer = null; // 下落定时器
+
+        // 初始化游戏面板（创建一个ROWS x COLS的二维数组，初始值为0）
+        function initGameBoard() {
+            gameBoard = [];
+            for (let y = 0; y < ROWS; y++) {
+                gameBoard[y] = [];
+                for (let x = 0; x < COLS; x++) {
+                    gameBoard[y][x] = 0;
+                }
             }
-            return matrix;
         }
-        
-        // 创建随机方块类型
-        function createPieceType() {
-            return Math.floor(Math.random() * 7) + 1;
+
+        // 4. 生成随机的俄罗斯方块
+        function generateRandomTetromino() {
+            const keys = Object.keys(TETROMINOS);
+            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+            const tetromino = TETROMINOS[randomKey];
+
+            // 初始化方块的初始位置（居中、顶部）
+            currentTetromino = JSON.parse(JSON.stringify(tetromino)); // 深拷贝，避免修改原数据
+            currentX = Math.floor(COLS / 2) - Math.floor(currentTetromino.shape[0].length / 2);
+            currentY = 0;
+
+            // 检查是否游戏结束（新方块生成即碰撞，说明面板已满）
+            if (checkCollision()) {
+                clearInterval(dropTimer);
+                alert(`游戏结束！你的最终分数：${score}`);
+                resetGame();
+            }
         }
-        
-        // 根据类型创建方块
-        function createPiece(type) {
-            const pieceType = type || createPieceType();
-            return {
-                pos: {x: Math.floor(COLS / 2) - 1, y: 0},
-                matrix: SHAPES[pieceType],
-                type: pieceType
-            };
-        }
-        
-        // 绘制方块
-        function drawBlock(ctx, x, y, type) {
-            ctx.fillStyle = COLORS[type];
-            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-            
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-            
-            // 添加内部高光效果
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE - 2, 3);
-            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, 3, BLOCK_SIZE - 2);
-            
-            // 添加阴影效果
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-            ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + BLOCK_SIZE - 3, BLOCK_SIZE - 2, 3);
-            ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 3, y * BLOCK_SIZE + 2, 3, BLOCK_SIZE - 2);
-            
-            // 添加内部渐变效果
-            const gradient = ctx.createRadialGradient(
-                x * BLOCK_SIZE + BLOCK_SIZE/2, y * BLOCK_SIZE + BLOCK_SIZE/2, 0,
-                x * BLOCK_SIZE + BLOCK_SIZE/2, y * BLOCK_SIZE + BLOCK_SIZE/2, BLOCK_SIZE/2
-            );
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-        }
-        
-        // 绘制游戏板
-        function drawBoard() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 绘制背景渐变
-            const bgGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            bgGradient.addColorStop(0, 'rgba(26, 26, 46, 0.3)');
-            bgGradient.addColorStop(1, 'rgba(22, 33, 62, 0.3)');
-            ctx.fillStyle = bgGradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // 绘制背景网格
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.lineWidth = 1;
-            for (let x = 0; x < COLS; x++) {
-                for (let y = 0; y < ROWS; y++) {
+
+        // 5. 绘制游戏面板（已落地的方块）
+        function drawGameBoard() {
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    const block = gameBoard[y][x];
+                    // 绘制格子边框（低饱和灰，更柔和）
+                    ctx.strokeStyle = '#555555';
                     ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    // 如果有方块，填充对应低饱和度颜色
+                    if (block) {
+                        ctx.fillStyle = block;
+                        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1); // 减1避免覆盖边框
+                    }
                 }
             }
-            
-            // 绘制已固定的方块
-            board.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        drawBlock(ctx, x, y, value);
+        }
+
+        // 6. 绘制当前下落的方块
+        function drawCurrentTetromino() {
+            const shape = currentTetromino.shape;
+            const color = currentTetromino.color;
+
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        // 计算方块在Canvas上的实际坐标
+                        const actualX = (currentX + x) * BLOCK_SIZE;
+                        const actualY = (currentY + y) * BLOCK_SIZE;
+
+                        // 填充低饱和度方块颜色
+                        ctx.fillStyle = color;
+                        ctx.fillRect(actualX, actualY, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+                        // 低饱和浅灰边框，替代纯白，更协调
+                        ctx.strokeStyle = '#dddddd';
+                        ctx.strokeRect(actualX, actualY, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
                     }
-                });
-            });
-            
-            // 绘制当前下落的方块
-            if (player.matrix) {
-                player.matrix.forEach((row, y) => {
-                    row.forEach((value, x) => {
-                        if (value !== 0) {
-                            // 为下落中的方块添加阴影效果
-                            ctx.save();
-                            ctx.globalAlpha = 0.7;
-                            drawBlock(ctx, x + player.pos.x, y + player.pos.y, value);
-                            ctx.restore();
-                            
-                            // 添加强调边框
-                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                            ctx.lineWidth = 2;
-                            ctx.strokeRect(
-                                (x + player.pos.x) * BLOCK_SIZE, 
-                                (y + player.pos.y) * BLOCK_SIZE, 
-                                BLOCK_SIZE, 
-                                BLOCK_SIZE
-                            );
+                }
+            }
+        }
+
+        // 7. 碰撞检测（判断当前方块是否超出边界或与已落地方块重叠）
+        function checkCollision() {
+            const shape = currentTetromino.shape;
+
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const newX = currentX + x;
+                        const newY = currentY + y;
+
+                        // 检测是否超出左右边界、下边界，或与已落地方块重叠
+                        if (
+                            newX < 0 || // 左边界
+                            newX >= COLS || // 右边界
+                            newY >= ROWS || // 下边界
+                            (newY >= 0 && gameBoard[newY][newX]) // 与已落地方块重叠（newY>=0避免检测顶部未落地区域）
+                        ) {
+                            return true; // 发生碰撞
                         }
-                    });
-                });
-            }
-            
-            // 绘制游戏区域边框
-            ctx.strokeStyle = '#4cc9f0';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(0, 0, canvas.width, canvas.height);
-        }
-        
-        // 绘制下一个方块预览
-        function drawNextPiece() {
-            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-            
-            if (!nextPieceType) return;
-            
-            // 创建预览方块
-            const previewPiece = createPiece(nextPieceType);
-            
-            // 添加预览背景
-            const previewGradient = nextCtx.createLinearGradient(0, 0, nextCanvas.width, nextCanvas.height);
-            previewGradient.addColorStop(0, 'rgba(67, 97, 238, 0.1)');
-            previewGradient.addColorStop(1, 'rgba(76, 201, 240, 0.1)');
-            nextCtx.fillStyle = previewGradient;
-            nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
-            
-            // 居中显示
-            const offsetX = (nextCanvas.width / BLOCK_SIZE - previewPiece.matrix[0].length) / 2;
-            const offsetY = (nextCanvas.height / BLOCK_SIZE - previewPiece.matrix.length) / 2;
-            
-            previewPiece.matrix.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        drawBlock(nextCtx, x + offsetX, y + offsetY, value);
-                    }
-                });
-            });
-            
-            // 添加预览边框
-            nextCtx.strokeStyle = '#4361ee';
-            nextCtx.lineWidth = 2;
-            nextCtx.strokeRect(0, 0, nextCanvas.width, nextCanvas.height);
-        }
-        
-        // 碰撞检测
-        function collide(board, player) {
-            const [m, o] = [player.matrix, player.pos];
-            for (let y = 0; y < m.length; ++y) {
-                for (let x = 0; x < m[y].length; ++x) {
-                    if (m[y][x] !== 0 &&
-                       (board[y + o.y] &&
-                        board[y + o.y][x + o.x]) !== 0) {
-                        return true;
                     }
                 }
             }
-            return false;
+            return false; // 无碰撞
         }
-        
-        // 合并方块到游戏板
-        function merge(board, player) {
-            player.matrix.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        board[y + player.pos.y][x + player.pos.x] = value;
-                    }
-                });
-            });
-        }
-        
-        // 旋转方块
-        function rotate(matrix, dir) {
-            for (let y = 0; y < matrix.length; ++y) {
-                for (let x = 0; x < y; ++x) {
-                    [
-                        matrix[x][y],
-                        matrix[y][x]
-                    ] = [
-                        matrix[y][x],
-                        matrix[x][y]
-                    ];
-                }
-            }
-            
-            if (dir > 0) {
-                matrix.forEach(row => row.reverse());
-            } else {
-                matrix.reverse();
-            }
-        }
-        
-        // 玩家旋转
-        function playerRotate(dir) {
-            if (gameOver || paused) return;
-            
-            const pos = player.pos.x;
-            let offset = 1;
-            rotate(player.matrix, dir);
-            
-            while (collide(board, player)) {
-                player.pos.x += offset;
-                offset = -(offset + (offset > 0 ? 1 : -1));
-                if (offset > player.matrix[0].length) {
-                    rotate(player.matrix, -dir);
-                    player.pos.x = pos;
-                    return;
-                }
-            }
-        }
-        
-        // 玩家移动
-        function playerMove(dir) {
-            if (gameOver || paused) return;
-            
-            player.pos.x += dir;
-            if (collide(board, player)) {
-                player.pos.x -= dir;
-            }
-        }
-        
-        // 玩家下落
-        function playerDrop() {
-            if (gameOver || paused) return;
-            
-            player.pos.y++;
-            if (collide(board, player)) {
-                player.pos.y--;
-                merge(board, player);
-                playerReset();
-                sweep();
-                updateScore();
-            }
-            dropCounter = 0;
-        }
-        
-        // 玩家快速下落（硬降落）
-        function playerDropToBottom() {
-            if (gameOver || paused) return;
-            
-            while (!collide(board, player)) {
-                player.pos.y++;
-            }
-            player.pos.y--;
-            merge(board, player);
-            playerReset();
-            sweep();
-            updateScore();
-            dropCounter = 0;
-        }
-        
-        // 玩家重置（获取新方块）
-        function playerReset() {
-            // 设置当前方块为下一个预览的方块
-            if (nextPieceType) {
-                player.matrix = SHAPES[nextPieceType];
-                player.type = nextPieceType;
-            } else {
-                // 如果没有下一个方块（游戏开始时），创建一个新的
-                const newType = createPieceType();
-                player.matrix = SHAPES[newType];
-                player.type = newType;
-                nextPieceType = createPieceType(); // 同时创建下一个方块
-            }
-            
-            player.pos.y = 0;
-            player.pos.x = Math.floor(COLS / 2) - Math.floor(player.matrix[0].length / 2);
-            
-            // 生成新的下一个方块类型（立即更新预览）
-            nextPieceType = createPieceType();
-            drawNextPiece(); // 立即绘制下一个方块预览
-            
-            // 检查游戏是否结束
-            if (collide(board, player)) {
-                gameOver = true;
-                gameStatusElement.textContent = "游戏结束！";
-                gameStatusElement.style.color = "#f72585";
-                gameStatusElement.innerHTML = "<i class='fas fa-skull-crossbones'></i> 游戏结束！";
-            }
-        }
-        
-        // 消行
-        function sweep() {
-            let rowCount = 0;
-            
-            outer: for (let y = board.length - 1; y >= 0; --y) {
-                for (let x = 0; x < board[y].length; ++x) {
-                    if (board[y][x] === 0) {
-                        continue outer;
+
+        // 8. 固定当前方块到游戏面板（方块落地时调用）
+        function lockTetromino() {
+            const shape = currentTetromino.shape;
+            const color = currentTetromino.color;
+
+            for (let y = 0; y < shape.length; y++) {
+                for (let x = 0; x < shape[y].length; x++) {
+                    if (shape[y][x]) {
+                        const actualX = currentX + x;
+                        const actualY = currentY + y;
+                        if (actualY >= 0) { // 避免记录顶部超出面板的方块
+                            gameBoard[actualY][actualX] = color;
+                        }
                     }
                 }
-                
-                // 移除已填满的行并添加新的空行在顶部
-                const row = board.splice(y, 1)[0].fill(0);
-                board.unshift(row);
-                ++y;
-                
-                rowCount++;
             }
-            
-            if (rowCount > 0) {
-                // 更新分数和等级
-                lines += rowCount;
-                score += rowCount * 100 * level;
-                
-                // 连续消除多行有奖励
-                if (rowCount > 1) {
-                    score += (rowCount - 1) * 50 * level;
-                }
-                
-                // 每消除10行升一级
-                level = Math.floor(lines / 10) + 1;
-                
-                // 随着等级提高，下落速度加快
-                dropInterval = Math.max(100, 1000 - (level - 1) * 100);
-                
-                // 添加分数增加动画效果
-                scoreElement.style.transform = 'scale(1.2)';
-                setTimeout(() => {
-                    scoreElement.style.transform = 'scale(1)';
-                }, 200);
-                
-                updateDisplay();
-            }
+
+            // 消除满行并更新分数
+            clearFullRows();
+
+            // 生成新的方块
+            generateRandomTetromino();
         }
-        
-        // 更新分数显示
-        function updateScore() {
+
+        // 9. 消除满行
+        function clearFullRows() {
+            let rowsCleared = 0;
+
+            for (let y = ROWS - 1; y >= 0; y--) {
+                // 判断当前行是否满格
+                const isFullRow = gameBoard[y].every(block => block !== 0);
+
+                if (isFullRow) {
+                    // 移除当前行，并在顶部添加一行空行
+                    gameBoard.splice(y, 1);
+                    gameBoard.unshift(Array(COLS).fill(0));
+                    // 行消除后，y需要保持不变（因为上方的行会下落一行）
+                    y++;
+                    // 更新消除行数和分数
+                    rowsCleared++;
+                }
+            }
+
+            // 计算分数（每行10分，可扩展为多行消除加分）
+            score += rowsCleared * 10;
             scoreElement.textContent = score;
-            levelElement.textContent = level;
-            linesElement.textContent = lines;
+
+            // 分数更新视觉反馈（轻微闪烁，低饱和颜色更协调）
+            scoreElement.style.opacity = 0.5;
+            setTimeout(() => {
+                scoreElement.style.opacity = 1;
+            }, 200);
         }
-        
-        // 更新显示
-        function updateDisplay() {
-            updateScore();
-            drawNextPiece();
-        }
-        
-        // 更新游戏状态
-        function update(time = 0) {
-            if (gameOver) return;
-            
-            const deltaTime = time - lastTime;
-            lastTime = time;
-            
-            if (!paused) {
-                dropCounter += deltaTime;
-                if (dropCounter > dropInterval) {
-                    playerDrop();
+
+        // 10. 旋转当前方块
+        function rotateTetromino() {
+            const originalShape = JSON.parse(JSON.stringify(currentTetromino.shape));
+            const rows = originalShape.length;
+            const cols = originalShape[0].length;
+
+            // 初始化旋转后的形状（矩阵转置 + 反转每行）
+            const rotatedShape = [];
+            for (let x = 0; x < cols; x++) {
+                rotatedShape[x] = [];
+                for (let y = rows - 1; y >= 0; y--) {
+                    rotatedShape[x][rows - 1 - y] = originalShape[y][x];
                 }
-                
-                drawBoard();
             }
-            
-            requestAnimationFrame(update);
+
+            // 尝试旋转（先修改形状，检测碰撞，若碰撞则恢复原形状）
+            currentTetromino.shape = rotatedShape;
+            if (checkCollision()) {
+                currentTetromino.shape = originalShape;
+            }
         }
-        
-        // 开始游戏
+
+        // 11. 方块下落
+        function dropTetromino() {
+            currentY++;
+            // 若碰撞则回退并固定方块
+            if (checkCollision()) {
+                currentY--;
+                lockTetromino();
+            }
+        }
+
+        // 12. 游戏渲染循环
+        function render() {
+            // 清空Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // 绘制游戏面板和当前方块
+            drawGameBoard();
+            drawCurrentTetromino();
+            // 继续下一帧渲染
+            requestAnimationFrame(render);
+        }
+
+        // 13. 键盘事件监听（关键修改：替换为WASD操作，保持功能不变）
+        function initKeyboardControls() {
+            document.addEventListener('keydown', (e) => {
+                // 忽略大小写，兼容用户开启大写锁定的情况
+                const key = e.key.toLowerCase();
+                switch (key) {
+                    case 'a': // A键：左移（对应原ArrowLeft）
+                        currentX--;
+                        if (checkCollision()) {
+                            currentX++;
+                        }
+                        break;
+                    case 'd': // D键：右移（对应原ArrowRight）
+                        currentX++;
+                        if (checkCollision()) {
+                            currentX--;
+                        }
+                        break;
+                    case 's': // S键：加速下落（对应原ArrowDown）
+                        dropTetromino();
+                        break;
+                    case 'w': // W键：旋转方块（对应原ArrowUp）
+                        rotateTetromino();
+                        break;
+                }
+            });
+        }
+
+        // 14. 重置游戏（游戏结束后调用）
+        function resetGame() {
+            score = 0;
+            scoreElement.textContent = score;
+            initGameBoard();
+            generateRandomTetromino();
+            // 重启下落定时器
+            clearInterval(dropTimer);
+            dropTimer = setInterval(dropTetromino, dropInterval);
+        }
+
+        // 15. 初始化并启动游戏
         function startGame() {
-            if (gameOver) {
-                // 重置游戏
-                board = createMatrix(COLS, ROWS);
-                score = 0;
-                level = 1;
-                lines = 0;
-                gameOver = false;
-                paused = false;
-                dropInterval = 1000;
-                
-                // 重置玩家和下一个方块
-                player = {
-                    pos: {x: 0, y: 0},
-                    matrix: null,
-                    type: null
-                };
-                
-                nextPieceType = createPieceType();
-                playerReset();
-                
-                updateDisplay();
-                gameStatusElement.textContent = "游戏进行中";
-                gameStatusElement.style.color = "#4cc9f0";
-                gameStatusElement.innerHTML = "<i class='fas fa-play-circle'></i> 游戏进行中";
-                startButton.innerHTML = '<i class="fas fa-play"></i> 开始游戏';
-                pauseButton.innerHTML = '<i class="fas fa-pause"></i> 暂停';
-            } else if (!paused) {
-                // 如果游戏正在进行中，点击开始按钮无效
-                return;
-            }
-            
-            // 如果游戏暂停，恢复游戏
-            if (paused) {
-                paused = false;
-                gameStatusElement.textContent = "游戏进行中";
-                gameStatusElement.style.color = "#4cc9f0";
-                gameStatusElement.innerHTML = "<i class='fas fa-play-circle'></i> 游戏进行中";
-                pauseButton.innerHTML = '<i class="fas fa-pause"></i> 暂停';
-            }
-            
-            lastTime = 0;
-            update();
+            initGameBoard();
+            initKeyboardControls();
+            generateRandomTetromino();
+            // 启动方块自动下落定时器
+            dropTimer = setInterval(dropTetromino, dropInterval);
+            // 启动渲染循环
+            render();
         }
-        
-        // 暂停/恢复游戏
-        function togglePause() {
-            if (gameOver) return;
-            
-            paused = !paused;
-            if (paused) {
-                gameStatusElement.textContent = "游戏已暂停";
-                gameStatusElement.style.color = "#ffbe0b";
-                gameStatusElement.innerHTML = "<i class='fas fa-pause-circle'></i> 游戏已暂停";
-                pauseButton.innerHTML = '<i class="fas fa-play"></i> 继续';
-            } else {
-                gameStatusElement.textContent = "游戏进行中";
-                gameStatusElement.style.color = "#4cc9f0";
-                gameStatusElement.innerHTML = "<i class='fas fa-play-circle'></i> 游戏进行中";
-                pauseButton.innerHTML = '<i class="fas fa-pause"></i> 暂停';
-                lastTime = 0;
-                update();
-            }
-        }
-        
-        // 重新开始游戏
-        function restartGame() {
-            gameOver = true; // 设置游戏结束状态，这样startGame会重置游戏
-            startGame();
-        }
-        
-        // 键盘控制 - 修复页面滚动问题
-        document.addEventListener('keydown', event => {
-            // 检查按下的键是否是我们游戏控制键
-            const gameKeys = ['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' ', 'p', 'P', 'Enter'];
-            
-            if (gameKeys.includes(event.key)) {
-                // 阻止这些键的默认行为（页面滚动等）
-                event.preventDefault();
-                
-                if (gameOver && event.key !== 'Enter') return;
-                
-                switch (event.key) {
-                    case 'ArrowLeft':
-                        playerMove(-1);
-                        break;
-                    case 'ArrowRight':
-                        playerMove(1);
-                        break;
-                    case 'ArrowDown':
-                        playerDrop();
-                        break;
-                    case 'ArrowUp':
-                        playerRotate(1);
-                        break;
-                    case ' ':
-                        playerDropToBottom();
-                        break;
-                    case 'p':
-                    case 'P':
-                        togglePause();
-                        break;
-                    case 'Enter':
-                        if (gameOver) startGame();
-                        break;
-                }
-            }
-        });
-        
-        // 移动设备控制
-        mobileLeft.addEventListener('click', () => playerMove(-1));
-        mobileRight.addEventListener('click', () => playerMove(1));
-        mobileDown.addEventListener('click', () => playerDrop());
-        mobileRotate.addEventListener('click', () => playerRotate(1));
-        mobileDrop.addEventListener('click', () => playerDropToBottom());
-        
-        // 按钮事件
-        startButton.addEventListener('click', startGame);
-        pauseButton.addEventListener('click', togglePause);
-        restartButton.addEventListener('click', restartGame);
-        
-        // 初始化游戏
-        board = createMatrix(COLS, ROWS);
-        nextPieceType = createPieceType(); // 先生成下一个方块类型
-        playerReset(); // 这会设置当前方块并生成新的下一个方块
-        drawBoard();
-        drawNextPiece(); // 确保下一个方块预览被绘制
-        updateDisplay();
-        
-        // 更新游戏状态显示
-        gameStatusElement.textContent = "点击开始游戏";
-        gameStatusElement.style.color = "#4cc9f0";
-        gameStatusElement.innerHTML = "<i class='fas fa-mouse-pointer'></i> 点击开始游戏";
-        
-        // 添加一个全局的键盘事件监听器，防止方向键滚动页面
-        // 当用户点击游戏区域时，确保焦点在游戏上
-        canvas.addEventListener('click', () => {
-            canvas.focus();
-        });
-        
-        // 给游戏区域添加tabindex属性，使其可以接收焦点
-        canvas.setAttribute('tabindex', '0');
-        
-        // 当游戏区域获得焦点时，添加一个视觉指示
-        canvas.addEventListener('focus', () => {
-            canvas.style.boxShadow = '0 0 0 3px rgba(76, 201, 240, 0.5), 0 0 25px rgba(76, 201, 240, 0.3)';
-        });
-        
-        canvas.addEventListener('blur', () => {
-            canvas.style.boxShadow = '0 0 20px rgba(76, 201, 240, 0.3)';
-        });
-        
-        // 初始化时给游戏区域焦点
-        canvas.focus();
+
+        // 页面加载完成后启动游戏
+        window.onload = startGame;
     </script>
 </body>
 </html>

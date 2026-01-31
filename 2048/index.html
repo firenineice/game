@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 小游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            background-color: #faf8ef;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 50px;
+        }
+
+        /* 游戏标题和得分区域 */
+        .game-header {
+            width: 460px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .game-title {
+            font-size: 80px;
+            color: #776e65;
+            font-weight: bold;
+        }
+
+        .score-panel {
+            display: flex;
+            gap: 10px;
+        }
+
+        .score-box {
+            background-color: #bbada0;
+            padding: 15px 20px;
+            border-radius: 5px;
+            text-align: center;
+            color: white;
+        }
+
+        .score-box .label {
+            font-size: 14px;
+            color: #eee4da;
+        }
+
+        .score-box .value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        /* 游戏面板 */
+        .game-container {
+            width: 460px;
+            height: 460px;
+            background-color: #bbada0;
+            border-radius: 10px;
+            padding: 15px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        /* 格子样式 */
+        .grid-cell {
+            background-color: #cdc1b4;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            font-weight: bold;
+            color: #776e65;
+        }
+
+        /* 不同数字的格子样式（2048经典配色） */
+        .cell-2 { background-color: #eee4da; }
+        .cell-4 { background-color: #ede0c8; }
+        .cell-8 { background-color: #f2b179; color: #f9f6f2; }
+        .cell-16 { background-color: #f59563; color: #f9f6f2; }
+        .cell-32 { background-color: #f67c5f; color: #f9f6f2; }
+        .cell-64 { background-color: #f65e3b; color: #f9f6f2; }
+        .cell-128 { background-color: #edcf72; color: #f9f6f2; font-size: 36px; }
+        .cell-256 { background-color: #edcc61; color: #f9f6f2; font-size: 36px; }
+        .cell-512 { background-color: #edc850; color: #f9f6f2; font-size: 36px; }
+        .cell-1024 { background-color: #edc53f; color: #f9f6f2; font-size: 30px; }
+        .cell-2048 { background-color: #edc22e; color: #f9f6f2; font-size: 30px; }
+        .cell-4096 { background-color: #3c3a32; color: #f9f6f2; font-size: 30px; }
+
+        /* 重新开始按钮 */
+        .restart-btn {
+            background-color: #8f7a66;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .restart-btn:hover {
+            background-color: #786452;
+        }
+
+        /* 游戏提示 */
+        .game-tip {
+            margin-top: 20px;
+            color: #776e65;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 游戏头部（标题+得分） -->
+    <div class="game-header">
+        <div class="game-title">2048</div>
+        <div class="score-panel">
+            <div class="score-box">
+                <div class="label">得分</div>
+                <div class="value" id="score">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏面板（4x4格子） -->
+    <div class="game-container" id="gameContainer"></div>
+
+    <!-- 重新开始按钮 -->
+    <button class="restart-btn" id="restartBtn">重新开始游戏</button>
+
+    <!-- 游戏提示：修改为WASD操作说明 -->
+    <div class="game-tip">使用 WASD 键控制数字移动（W上/A左/S下/D右），相同数字碰撞会合并成它们的和</div>
+
+    <script>
+        // 全局变量
+        let gameContainer = document.getElementById('gameContainer');
+        let scoreElement = document.getElementById('score');
+        let restartBtn = document.getElementById('restartBtn');
+        let grid = []; // 4x4 游戏网格数据
+        let score = 0; // 当前得分
+
+        // 初始化游戏
+        function initGame() {
+            // 重置得分
+            score = 0;
+            scoreElement.textContent = score;
+
+            // 初始化 4x4 空网格（值为 0 表示空格子）
+            grid = Array(4).fill(0).map(() => Array(4).fill(0));
+
+            // 清空游戏面板 DOM
+            gameContainer.innerHTML = '';
+
+            // 创建 4x4 格子 DOM 元素
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    let cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.id = `cell-${i}-${j}`;
+                    gameContainer.appendChild(cell);
+                }
+            }
+
+            // 生成两个初始数字（2 或 4）
+            generateRandomNumber();
+            generateRandomNumber();
+
+            // 更新界面显示
+            updateGridView();
+        }
+
+        // 生成随机数字（90% 概率 2，10% 概率 4）
+        function generateRandomNumber() {
+            // 收集所有空格子的坐标
+            let emptyCells = [];
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if (grid[i][j] === 0) {
+                        emptyCells.push({ x: i, y: j });
+                    }
+                }
+            }
+
+            // 没有空格子则返回（游戏结束）
+            if (emptyCells.length === 0) return;
+
+            // 随机选择一个空格子
+            let randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            let x = randomCell.x;
+            let y = randomCell.y;
+
+            // 随机生成 2 或 4
+            grid[x][y] = Math.random() < 0.9 ? 2 : 4;
+        }
+
+        // 更新网格界面显示（同步数据到 DOM）
+        function updateGridView() {
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    let cell = document.getElementById(`cell-${i}-${j}`);
+                    let value = grid[i][j];
+
+                    // 更新格子内容和样式
+                    if (value === 0) {
+                        cell.textContent = '';
+                        cell.className = 'grid-cell';
+                    } else {
+                        cell.textContent = value;
+                        cell.className = `grid-cell cell-${value}`;
+                    }
+                }
+            }
+
+            // 更新得分显示
+            scoreElement.textContent = score;
+        }
+
+        // 处理数字移动和合并（核心逻辑）
+        // direction: up(38), down(40), left(37), right(39)
+        function move(direction) {
+            let isGridChanged = false; // 标记网格是否发生变化（用于判断是否生成新数字）
+
+            // 复制原始网格，用于后续对比
+            let originalGrid = JSON.parse(JSON.stringify(grid));
+
+            switch (direction) {
+                case 37: // 向左（A键映射）
+                    for (let i = 0; i < 4; i++) {
+                        grid[i] = processRow(grid[i]);
+                    }
+                    break;
+                case 39: // 向右（D键映射）
+                    for (let i = 0; i < 4; i++) {
+                        // 反转行，向左处理，再反转回来
+                        grid[i] = processRow(grid[i].reverse()).reverse();
+                    }
+                    break;
+                case 38: // 向上（W键映射）
+                    for (let j = 0; j < 4; j++) {
+                        // 提取列数据，转成行处理
+                        let column = [grid[0][j], grid[1][j], grid[2][j], grid[3][j]];
+                        let processedColumn = processRow(column);
+                        // 把处理后的列数据写回网格
+                        for (let i = 0; i < 4; i++) {
+                            grid[i][j] = processedColumn[i];
+                        }
+                    }
+                    break;
+                case 40: // 向下（S键映射）
+                    for (let j = 0; j < 4; j++) {
+                        // 提取列数据，反转，向左处理，再反转回来
+                        let column = [grid[0][j], grid[1][j], grid[2][j], grid[3][j]];
+                        let processedColumn = processRow(column.reverse()).reverse();
+                        // 把处理后的列数据写回网格
+                        for (let i = 0; i < 4; i++) {
+                            grid[i][j] = processedColumn[i];
+                        }
+                    }
+                    break;
+            }
+
+            // 对比原始网格和处理后的网格，判断是否发生变化
+            isGridChanged = JSON.stringify(originalGrid) !== JSON.stringify(grid);
+
+            // 如果网格发生变化，生成新数字并检查游戏状态
+            if (isGridChanged) {
+                generateRandomNumber();
+                updateGridView();
+                checkGameStatus();
+            }
+        }
+
+        // 处理单行/列的数据（去空、合并、补空）
+        function processRow(row) {
+            // 步骤1：过滤掉所有 0（去空）
+            let newRow = row.filter(num => num !== 0);
+
+            // 步骤2：合并相邻相同的数字
+            for (let i = 0; i < newRow.length - 1; i++) {
+                if (newRow[i] === newRow[i + 1]) {
+                    newRow[i] *= 2; // 合并数字
+                    newRow[i + 1] = 0; // 被合并的数字置为 0
+                    score += newRow[i]; // 更新得分
+                }
+            }
+
+            // 步骤3：再次过滤掉 0（移除合并后的空值）
+            newRow = newRow.filter(num => num !== 0);
+
+            // 步骤4：补 0 到 4 位（保持网格结构）
+            while (newRow.length < 4) {
+                newRow.push(0);
+            }
+
+            return newRow;
+        }
+
+        // 检查游戏状态（胜利/失败）
+        function checkGameStatus() {
+            // 检查是否胜利（出现 2048）
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if (grid[i][j] === 2048) {
+                        setTimeout(() => {
+                            alert(`恭喜你！游戏胜利！最终得分：${score}`);
+                        }, 100);
+                        return;
+                    }
+                }
+            }
+
+            // 检查是否还有空格子
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if (grid[i][j] === 0) {
+                        return; // 还有空格子，游戏继续
+                    }
+                }
+            }
+
+            // 检查是否还有相邻相同的数字（可合并）
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    let current = grid[i][j];
+                    // 检查右侧相邻
+                    if (j < 3 && current === grid[i][j + 1]) {
+                        return;
+                    }
+                    // 检查下方相邻
+                    if (i < 3 && current === grid[i + 1][j]) {
+                        return;
+                    }
+                }
+            }
+
+            // 没有空格子且无法合并，游戏失败
+            setTimeout(() => {
+                alert(`游戏结束！最终得分：${score}`);
+            }, 100);
+        }
+
+        // 监听键盘事件：修改为WASD键映射（转成原有的方向键逻辑）
+        document.addEventListener('keydown', (e) => {
+            // 屏蔽大小写差异（e.key 忽略大小写，e.keyCode 区分，这里用e.key更直观）
+            let key = e.key.toLowerCase();
+            let directionCode = 0;
+
+            // 映射WASD到对应的方向键编码
+            switch (key) {
+                case 'w':
+                    directionCode = 38; // 对应上
+                    break;
+                case 'a':
+                    directionCode = 37; // 对应左
+                    break;
+                case 's':
+                    directionCode = 40; // 对应下
+                    break;
+                case 'd':
+                    directionCode = 39; // 对应右
+                    break;
+                default:
+                    return; // 非WASD键，直接返回不处理
+            }
+
+            e.preventDefault(); // 阻止页面滚动（避免按W/S时页面上下滚动）
+            move(directionCode);
+        });
+
+        // 监听重新开始按钮点击事件
+        restartBtn.addEventListener('click', initGame);
+
+        // 页面加载完成后初始化游戏
+        window.onload = initGame;
+    </script>
+</body>
+</html>

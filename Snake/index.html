@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASD 控制贪吃蛇</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+        }
+
+        h1 {
+            color: #263238;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .score {
+            font-size: 20px;
+            color: #37474f;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        canvas {
+            border: 3px solid #263238;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .tips {
+            margin-top: 15px;
+            color: #546e7a;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>贪吃蛇（WASD 控制）</h1>
+    <div class="score">当前得分：<span id="score">0</span></div>
+    <canvas id="snakeCanvas" width="400" height="400"></canvas>
+    <div class="tips">W-上 | A-左 | S-下 | D-右 | 撞墙/撞自己游戏结束</div>
+
+    <script>
+        // 1. 获取DOM元素和初始化画布
+        const canvas = document.getElementById('snakeCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        // 游戏配置参数（方便调整）
+        const gridSize = 20; // 蛇和食物的格子大小（画布宽高需是gridSize的整数倍）
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+
+        // 2. 游戏核心变量
+        let snake = [
+            { x: 10 * gridSize, y: 10 * gridSize } // 蛇初始位置（画布中心）
+        ];
+        let food = generateFood(); // 食物初始位置
+        let direction = 'right'; // 蛇初始移动方向
+        let nextDirection = 'right'; // 下一个移动方向（解决按键连按冲突）
+        let score = 0;
+        let gameLoop = null; // 游戏定时器
+        let gameSpeed = 150; // 游戏速度（数值越小越快，单位ms）
+
+        // 3. 生成食物（避免生成在蛇身上）
+        function generateFood() {
+            let newFood;
+            // 循环生成，直到食物不在蛇的身体上
+            while (!newFood || isOnSnake(newFood)) {
+                newFood = {
+                    x: Math.floor(Math.random() * (canvasWidth / gridSize)) * gridSize,
+                    y: Math.floor(Math.random() * (canvasHeight / gridSize)) * gridSize
+                };
+            }
+            return newFood;
+        }
+
+        // 辅助函数：判断坐标是否在蛇身上
+        function isOnSnake(pos) {
+            return snake.some(segment => segment.x === pos.x && segment.y === pos.y);
+        }
+
+        // 4. 监听WASD按键事件（控制蛇的方向）
+        document.addEventListener('keydown', (e) => {
+            // 防止反向移动（比如向右走时不能直接向左走）
+            switch (e.key.toLowerCase()) {
+                case 'w':
+                    if (direction !== 'down') nextDirection = 'up';
+                    break;
+                case 'a':
+                    if (direction !== 'right') nextDirection = 'left';
+                    break;
+                case 's':
+                    if (direction !== 'up') nextDirection = 'down';
+                    break;
+                case 'd':
+                    if (direction !== 'left') nextDirection = 'right';
+                    break;
+            }
+        });
+
+        // 5. 蛇的移动逻辑
+        function moveSnake() {
+            // 更新当前方向（解决按键连按导致的方向突变）
+            direction = nextDirection;
+
+            // 获取蛇头当前位置
+            const head = { ...snake[0] };
+
+            // 根据方向更新蛇头位置
+            switch (direction) {
+                case 'up':
+                    head.y -= gridSize;
+                    break;
+                case 'left':
+                    head.x -= gridSize;
+                    break;
+                case 'down':
+                    head.y += gridSize;
+                    break;
+                case 'right':
+                    head.x += gridSize;
+                    break;
+            }
+
+            // 把新蛇头添加到蛇身头部
+            snake.unshift(head);
+
+            // 6. 碰撞检测（撞墙/撞自己）
+            if (checkCollision(head)) {
+                clearInterval(gameLoop);
+                alert(`游戏结束！最终得分：${score}`);
+                // 刷新页面重新开始游戏
+                window.location.reload();
+                return;
+            }
+
+            // 7. 判断是否吃到食物
+            if (head.x === food.x && head.y === food.y) {
+                // 吃到食物：更新得分，重新生成食物（不删除蛇尾，蛇变长）
+                score += 10;
+                scoreElement.textContent = score;
+                food = generateFood();
+            } else {
+                // 没吃到食物：删除蛇尾（保持蛇身长度不变）
+                snake.pop();
+            }
+        }
+
+        // 辅助函数：碰撞检测
+        function checkCollision(head) {
+            // 撞墙检测（超出画布边界）
+            if (
+                head.x < 0 ||
+                head.x >= canvasWidth ||
+                head.y < 0 ||
+                head.y >= canvasHeight
+            ) {
+                return true;
+            }
+
+            // 撞自己检测（蛇头和蛇身其他部分重合）
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // 新增：绘制网格背景
+        function drawGrid() {
+            ctx.strokeStyle = '#e0e0e0'; // 网格线颜色（浅灰，不刺眼）
+            ctx.lineWidth = 1; // 网格线粗细
+
+            // 绘制竖线
+            for (let x = 0; x <= canvasWidth; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvasHeight);
+                ctx.stroke();
+            }
+
+            // 绘制横线
+            for (let y = 0; y <= canvasHeight; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvasWidth, y);
+                ctx.stroke();
+            }
+        }
+
+        // 8. 绘制游戏画面（网格、蛇、食物）
+        function drawGame() {
+            // 清空画布
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            // 第一步：绘制网格背景（先画网格，避免遮挡蛇和食物）
+            drawGrid();
+
+            // 第二步：绘制蛇
+            snake.forEach((segment, index) => {
+                // 蛇头用深绿色，蛇身用浅绿色，区分更清晰
+                ctx.fillStyle = index === 0 ? '#2ecc71' : '#27ae60';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.fillRect(segment.x, segment.y, gridSize - 1, gridSize - 1);
+                ctx.strokeRect(segment.x, segment.y, gridSize - 1, gridSize - 1);
+            });
+
+            // 第三步：绘制食物
+            ctx.fillStyle = '#e74c3c';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.fillRect(food.x, food.y, gridSize - 1, gridSize - 1);
+            ctx.strokeRect(food.x, food.y, gridSize - 1, gridSize - 1);
+        }
+
+        // 9. 游戏主更新循环（移动+绘制）
+        function gameUpdate() {
+            moveSnake();
+            drawGame();
+        }
+
+        // 10. 启动游戏
+        gameLoop = setInterval(gameUpdate, gameSpeed);
+    </script>
+</body>
+</html>
