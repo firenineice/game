@@ -45,424 +45,673 @@
     <p class="tips">鼠标控拍 | 所有小球落地结束 | 消除所有砖块获胜</p>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+        // 游戏核心封装：模块化、低耦合、高可维护
+        class BreakoutGame {
+            constructor(canvasId) {
+                // 1. 初始化画布和上下文
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.canvasWidth = this.canvas.width;
+                this.canvasHeight = this.canvas.height;
 
-        // 游戏核心配置（简洁无冗余）
-        const GAME_CONFIG = {
-            paddle: {
-                width: 120,
-                height: 20,
-                speed: 8,
-                color: '#e74c3c',
-                originalWidth: 120
-            },
-            ball: {
-                radius: 10,
-                speedX: 4,
-                speedY: -4,
-                color: '#3498db',
-                maxDX: 8,
-                originalSpeedX: 4,
-                originalSpeedY: -4,
-                multiCount: 2  // 额外生成2个小球
-            },
-            brick: {
-                row: 8,
-                col: 16,
-                width: 40,
-                height: 15,
-                margin: 5,
-                normalColor: '#27ae60', // 普通砖块：深绿
-                functionTypes: [
-                    { type: 'bigPaddle', color: '#0099ff', rate: 0.15 }, // 大球拍：亮蓝
-                    { type: 'penetrate', color: '#ff66cc', rate: 0.15 }, // 穿透：亮粉
-                    { type: 'reset', color: '#ff9900', rate: 0.15 },     // 恢复：亮橙
-                    { type: 'multiBall', color: '#9933ff', rate: 0.2 }   // 多小球：炫紫
-                ]
-            },
-            gameState: {
-                isOver: false,
-                isWin: false,
-                isPenetrate: false,
-                bigPaddleTimer: 0,
-                penetrateTimer: 0
-            }
-        };
-
-        const paddle = {
-            x: canvas.width / 2 - GAME_CONFIG.paddle.width / 2,
-            y: canvas.height - 40,
-            width: GAME_CONFIG.paddle.width,
-            height: GAME_CONFIG.paddle.height,
-            color: GAME_CONFIG.paddle.color,
-            dx: 0
-        };
-
-        // 小球数组（支持多小球）
-        let balls = [];
-        initBalls();
-
-        let bricks = [];
-        initBricks();
-
-        // 初始化小球数组（默认1个小球）
-        function initBalls() {
-            balls = [];
-            const defaultBall = {
-                x: canvas.width / 2,
-                y: paddle.y - GAME_CONFIG.ball.radius,
-                radius: GAME_CONFIG.ball.radius,
-                dx: GAME_CONFIG.ball.speedX,
-                dy: GAME_CONFIG.ball.speedY,
-                color: GAME_CONFIG.ball.color
-            };
-            balls.push(defaultBall);
-        }
-
-        // 功能砖块生成逻辑（概率区间法）
-        function initBricks() {
-            bricks = [];
-            const brickTotalWidth = (GAME_CONFIG.brick.width + GAME_CONFIG.brick.margin) * GAME_CONFIG.brick.col - GAME_CONFIG.brick.margin;
-            const startX = (canvas.width - brickTotalWidth) / 2;
-            const startY = 50;
-
-            for (let row = 0; row < GAME_CONFIG.brick.row; row++) {
-                for (let col = 0; col < GAME_CONFIG.brick.col; col++) {
-                    const brickBase = {
-                        x: startX + col * (GAME_CONFIG.brick.width + GAME_CONFIG.brick.margin),
-                        y: startY + row * (GAME_CONFIG.brick.height + GAME_CONFIG.brick.margin),
-                        width: GAME_CONFIG.brick.width,
-                        height: GAME_CONFIG.brick.height,
-                        color: GAME_CONFIG.brick.normalColor,
-                        isAlive: true,
-                        functionType: null,
-                        isMultiBall: false // 标记多小球砖块
-                    };
-
-                    const randomNum = Math.random();
-                    let probabilitySum = 0;
-                    let selectedFunc = null;
-
-                    for (const func of GAME_CONFIG.brick.functionTypes) {
-                        probabilitySum += func.rate;
-                        if (randomNum <= probabilitySum) {
-                            selectedFunc = func;
-                            break;
-                        }
+                // 2. 游戏核心配置（语义化、可配置）
+                this.config = {
+                    paddle: {
+                        width: 120,
+                        height: 20,
+                        color: '#e74c3c',
+                        yOffset: 40, // 球拍距离底部偏移量
+                        widthTransitionStep: 12, // 球拍宽度过渡步长（值越大过渡越快，推荐10-15）
+                    },
+                    ball: {
+                        radius: 10,
+                        speedX: 4,
+                        speedY: -4,
+                        color: '#34495e',
+                        maxDX: 8,
+                        splitCount: 2, // 分裂额外生成小球数量
+                    },
+                    brick: {
+                        rows: 8,
+                        cols: 16,
+                        width: 40,
+                        height: 15,
+                        margin: 5,
+                        normalColor: '#27ae60',
+                        splitBrickCount: 3, // 固定分裂砖块数量（2-4）
+                        funcBrickConfigs: [
+                            { type: 'bigPaddle', color: '#0099ff', rate: 0.12 },
+                            { type: 'penetrate', color: '#ff66cc', rate: 0.12 },
+                            { type: 'reset', color: '#ff9900', rate: 0.12 },
+                        ],
+                        splitBrickConfig: { type: 'split', color: '#9933ff' },
+                    },
+                    effect: {
+                        bigPaddleScale: 1.5,
+                        bigPaddleDuration: 5000,
+                        penetrateDuration: 3000,
                     }
+                };
 
-                    if (selectedFunc) {
-                        brickBase.color = selectedFunc.color;
-                        brickBase.functionType = selectedFunc.type;
-                        if (selectedFunc.type === 'multiBall') {
-                            brickBase.isMultiBall = true;
-                        }
+                // 3. 游戏状态（统一管理，便于维护）
+                this.gameState = {
+                    isOver: false,
+                    isWin: false,
+                    isPenetrate: false,
+                    bigPaddleTimer: 0,
+                    deltaTime: 16, // 帧间隔时间（约60帧/秒）
+                };
+
+                // 4. 核心游戏对象初始化
+                this.paddle = null;
+                this.balls = [];
+                this.bricks = [];
+
+                // 5. 初始化游戏
+                this.init();
+            }
+
+            // ---------------------- 初始化相关方法 ----------------------
+            /**
+             * 游戏整体初始化
+             */
+            init() {
+                this.validateConfig(); // 校验配置合法性
+                this.initPaddle();     // 初始化球拍
+                this.initBalls();      // 初始化小球
+                this.initBricks();     // 初始化砖块
+                this.bindEvents();     // 绑定交互事件
+                this.gameLoop();       // 启动游戏循环
+            }
+
+            /**
+             * 校验配置（确保分裂砖块数量在2-4之间）
+             */
+            validateConfig() {
+                const { brick } = this.config;
+                brick.splitBrickCount = Math.max(2, Math.min(4, brick.splitBrickCount));
+            }
+
+            /**
+             * 初始化球拍（新增targetWidth用于过渡动画）
+             */
+            initPaddle() {
+                const { paddle } = this.config;
+                this.paddle = {
+                    x: (this.canvasWidth - paddle.width) / 2,
+                    y: this.canvasHeight - paddle.yOffset,
+                    width: paddle.width,
+                    targetWidth: paddle.width, // 目标宽度（用于过渡动画）
+                    height: paddle.height,
+                    color: paddle.color,
+                    originalWidth: paddle.width,
+                };
+            }
+
+            /**
+             * 初始化小球（默认1个）
+             */
+            initBalls() {
+                this.balls = [];
+                const { ball } = this.config;
+                const defaultBall = {
+                    x: this.canvasWidth / 2,
+                    y: this.paddle.y - ball.radius,
+                    radius: ball.radius,
+                    dx: ball.speedX,
+                    dy: ball.speedY,
+                    color: ball.color,
+                };
+                this.balls.push(defaultBall);
+            }
+
+            /**
+             * 初始化砖块（固定数量分裂砖块，随机分布）
+             */
+            initBricks() {
+                this.bricks = [];
+                const { brick } = this.config;
+                const totalBricks = brick.rows * brick.cols;
+
+                // 计算砖块布局固定参数（避免重复计算）
+                const brickTotalWidth = (brick.width + brick.margin) * brick.cols - brick.margin;
+                const startX = (this.canvasWidth - brickTotalWidth) / 2;
+                const startY = 50;
+
+                // 步骤1：生成普通砖块和其他功能砖块
+                for (let row = 0; row < brick.rows; row++) {
+                    for (let col = 0; col < brick.cols; col++) {
+                        const brickX = startX + (brick.width + brick.margin) * col;
+                        const brickY = startY + (brick.height + brick.margin) * row;
+                        let newBrick = this.createBaseBrick(brickX, brickY);
+
+                        // 生成其他功能砖块
+                        newBrick = this.applyFuncBrickConfig(newBrick);
+                        this.bricks.push(newBrick);
                     }
-
-                    bricks.push(brickBase);
                 }
+
+                // 步骤2：随机挑选固定数量砖块改为分裂砖块（不重复）
+                const splitIndices = this.getUniqueRandomIndices(totalBricks, brick.splitBrickCount);
+                splitIndices.forEach(index => {
+                    this.bricks[index].color = brick.splitBrickConfig.color;
+                    this.bricks[index].type = brick.splitBrickConfig.type;
+                    this.bricks[index].isSplitBrick = true;
+                });
             }
-        }
 
-        // 绘制所有元素（无冗杂文字）
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            /**
+             * 创建基础砖块
+             * @param {number} x 砖块x坐标
+             * @param {number} y 砖块y坐标
+             * @returns 基础砖块对象
+             */
+            createBaseBrick(x, y) {
+                const { brick } = this.config;
+                return {
+                    x,
+                    y,
+                    width: brick.width,
+                    height: brick.height,
+                    color: brick.normalColor,
+                    isAlive: true,
+                    type: 'normal',
+                    isSplitBrick: false,
+                };
+            }
 
-            // 绘制球拍
-            ctx.fillStyle = paddle.color;
-            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
-            ctx.strokeStyle = '#c0392b';
-            ctx.strokeRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            /**
+             * 为基础砖块应用功能配置（大球拍/穿透/恢复）
+             * @param {object} brick 基础砖块对象
+             * @returns 处理后的砖块对象
+             */
+            applyFuncBrickConfig(brick) {
+                const { funcBrickConfigs } = this.config.brick;
+                const randomNum = Math.random();
+                let probabilitySum = 0;
 
-            // 绘制多小球
-            balls.forEach(ball => {
-                ctx.beginPath();
-                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-                ctx.fillStyle = ball.color;
-                ctx.fill();
-                ctx.strokeStyle = GAME_CONFIG.gameState.isPenetrate ? '#ff66cc' : '#2980b9';
-                ctx.stroke();
-                ctx.closePath();
-            });
-
-            // 绘制砖块（强化辨识度，无额外文字）
-            bricks.forEach(brick => {
-                if (brick.isAlive) {
-                    ctx.fillStyle = brick.color;
-                    ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
-                    // 多小球砖块白色粗描边，其他砖块对应描边
-                    if (brick.isMultiBall) {
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 2;
-                    } else if (brick.functionType) {
-                        ctx.strokeStyle = '#000000';
-                        ctx.lineWidth = 1;
-                    } else {
-                        ctx.strokeStyle = '#1e8449';
-                        ctx.lineWidth = 1;
+                for (const config of funcBrickConfigs) {
+                    probabilitySum += config.rate;
+                    if (randomNum <= probabilitySum) {
+                        brick.color = config.color;
+                        brick.type = config.type;
+                        break;
                     }
-                    ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
-                    ctx.lineWidth = 1; // 恢复默认线宽
-                }
-            });
-
-            // 绘制核心游戏状态提示
-            drawGameTips();
-            drawFunctionTimerTips();
-        }
-
-        // 绘制简洁功能倒计时提示（仅保留关键信息）
-        function drawFunctionTimerTips() {
-            ctx.font = '14px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillStyle = '#2c3e50';
-            let tipY = 20;
-
-            // 简化提示文案，去掉冗余词汇
-            if (GAME_CONFIG.gameState.bigPaddleTimer > 0) {
-                ctx.fillText(`大球拍：${(GAME_CONFIG.gameState.bigPaddleTimer / 1000).toFixed(1)}s`, 10, tipY);
-                tipY += 18;
-            }
-
-            if (GAME_CONFIG.gameState.penetrateTimer > 0) {
-                ctx.fillText(`穿透：${(GAME_CONFIG.gameState.penetrateTimer / 1000).toFixed(1)}s`, 10, tipY);
-                tipY += 18;
-            }
-
-            // 仅保留剩余小球数量（必要信息）
-            ctx.fillText(`剩余小球：${balls.length}`, 10, tipY);
-        }
-
-        function drawGameTips() {
-            ctx.font = '28px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = '#2c3e50';
-
-            // 仅保留游戏结束/获胜的核心提示
-            if (GAME_CONFIG.gameState.isOver) {
-                ctx.fillText('游戏结束 | 点击画布重开', canvas.width / 2, canvas.height / 2);
-            } else if (GAME_CONFIG.gameState.isWin) {
-                ctx.fillText('恭喜获胜 | 点击画布重开', canvas.width / 2, canvas.height / 2);
-            }
-        }
-
-        // 更新游戏状态（无冗余逻辑）
-        function update(timestamp) {
-            if (GAME_CONFIG.gameState.isOver || GAME_CONFIG.gameState.isWin) {
-                return;
-            }
-
-            updateFunctionTimers();
-
-            // 1. 更新球拍位置
-            paddle.x += paddle.dx;
-            if (paddle.x < 0) {
-                paddle.x = 0;
-            }
-            if (paddle.x + paddle.width > canvas.width) {
-                paddle.x = canvas.width - paddle.width;
-            }
-
-            // 2. 收集未落地的小球
-            const aliveBalls = [];
-
-            // 3. 遍历处理每个小球的位置和碰撞
-            balls.forEach((ball) => {
-                // 更新小球位置
-                ball.x += ball.dx;
-                ball.y += ball.dy;
-
-                // 4. 小球边界碰撞检测（左右）
-                if (ball.x - ball.radius < 0) {
-                    ball.dx = Math.abs(ball.dx);
-                    ball.x = ball.radius;
-                }
-                if (ball.x + ball.radius > canvas.width) {
-                    ball.dx = -Math.abs(ball.dx);
-                    ball.x = canvas.width - ball.radius;
                 }
 
-                // 5. 小球边界碰撞检测（上）
-                if (ball.y - ball.radius < 0) {
-                    ball.dy = -ball.dy;
-                    ball.y = ball.radius;
+                return brick;
+            }
+
+            // ---------------------- 工具方法 ----------------------
+            /**
+             * 获取指定数量的不重复随机索引
+             * @param {number} max 最大索引值
+             * @param {number} count 需要的索引数量
+             * @returns 不重复随机索引数组
+             */
+            getUniqueRandomIndices(max, count) {
+                const indices = [];
+                while (indices.length < count) {
+                    const randomIndex = Math.floor(Math.random() * max);
+                    if (!indices.includes(randomIndex)) {
+                        indices.push(randomIndex);
+                    }
+                }
+                return indices;
+            }
+
+            /**
+             * 限制数值在指定范围内
+             * @param {number} value 目标数值
+             * @param {number} min 最小值
+             * @param {number} max 最大值
+             * @returns 限制后的数值
+             */
+            clamp(value, min, max) {
+                return Math.max(min, Math.min(max, value));
+            }
+
+            // ---------------------- 事件绑定 ----------------------
+            /**
+             * 绑定鼠标交互事件
+             */
+            bindEvents() {
+                // 鼠标移动控制球拍
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (this.gameState.isOver || this.gameState.isWin) return;
+
+                    const rect = this.canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    // 限制球拍不出画布
+                    this.paddle.x = this.clamp(
+                        mouseX - this.paddle.width / 2,
+                        0,
+                        this.canvasWidth - this.paddle.width
+                    );
+                });
+
+                // 点击画布重置游戏
+                this.canvas.addEventListener('click', () => {
+                    if (this.gameState.isOver || this.gameState.isWin) {
+                        this.resetGame();
+                    }
+                });
+            }
+
+            // ---------------------- 游戏逻辑更新 ----------------------
+            /**
+             * 游戏状态更新（每一帧）
+             */
+            update() {
+                if (this.gameState.isOver || this.gameState.isWin) return;
+
+                this.updatePaddleWidthTransition(); // 新增：球拍宽度过渡动画
+                this.updateEffects(); // 更新特效倒计时
+                this.updateBalls();   // 更新小球状态
+                this.checkWinCondition(); // 检查获胜条件
+            }
+
+            /**
+             * 新增：球拍宽度过渡动画（快速平滑渐变）
+             */
+            updatePaddleWidthTransition() {
+                const { paddle } = this.config;
+                const currentPaddle = this.paddle;
+
+                // 若当前宽度与目标宽度一致，无需过渡
+                if (Math.abs(currentPaddle.width - currentPaddle.targetWidth) < 1) {
+                    currentPaddle.width = currentPaddle.targetWidth;
+                    return;
                 }
 
-                // 6. 小球与球拍碰撞检测
-                if (
-                    ball.y + ball.radius >= paddle.y &&
-                    ball.x >= paddle.x &&
-                    ball.x <= paddle.x + paddle.width
-                ) {
-                    const hitPosition = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-                    ball.dx = Math.max(-GAME_CONFIG.ball.maxDX, Math.min(hitPosition * 6, GAME_CONFIG.ball.maxDX));
-                    ball.dy = -Math.abs(ball.dy);
-                    ball.y = paddle.y - ball.radius;
+                // 计算过渡方向和步长，保证快速平滑
+                const step = paddle.widthTransitionStep;
+                if (currentPaddle.width < currentPaddle.targetWidth) {
+                    // 变长：向目标宽度增加
+                    currentPaddle.width = Math.min(currentPaddle.width + step, currentPaddle.targetWidth);
+                } else {
+                    // 变短：向目标宽度减少
+                    currentPaddle.width = Math.max(currentPaddle.width - step, currentPaddle.targetWidth);
                 }
 
-                // 7. 小球与砖块碰撞检测
-                bricks.forEach(brick => {
-                    if (brick.isAlive) {
-                        const isCollide = (
-                            ball.y - ball.radius <= brick.y + brick.height &&
-                            ball.y + ball.radius >= brick.y &&
-                            ball.x >= brick.x &&
-                            ball.x <= brick.x + brick.width
-                        );
+                // 同步调整球拍x坐标，保证球拍居中（视觉更舒适）
+                currentPaddle.x = this.clamp(
+                    currentPaddle.x - step / 2,
+                    0,
+                    this.canvasWidth - currentPaddle.width
+                );
+            }
 
-                        if (isCollide) {
-                            brick.isAlive = false;
+            /**
+             * 更新特效倒计时（大球拍/穿透）
+             */
+            updateEffects() {
+                const { gameState, config } = this;
+                const { deltaTime } = gameState;
+                const { bigPaddleScale } = config.effect;
 
-                            // 触发功能砖块效果
-                            if (brick.functionType) {
-                                triggerFunctionBrickEffect(brick.functionType);
-                            }
+                // 大球拍特效更新
+                if (gameState.bigPaddleTimer > 0) {
+                    gameState.bigPaddleTimer -= deltaTime;
+                    if (gameState.bigPaddleTimer <= 0) {
+                        // 特效结束：设置目标宽度为原始宽度，触发变短过渡
+                        this.paddle.targetWidth = this.paddle.originalWidth;
+                    }
+                }
 
-                            // 非穿透模式：小球反弹
-                            if (!GAME_CONFIG.gameState.isPenetrate) {
-                                ball.dy = -ball.dy;
-                            }
+                // 穿透特效更新
+                if (gameState.penetrateTimer > 0) {
+                    gameState.penetrateTimer -= deltaTime;
+                    if (gameState.penetrateTimer <= 0) {
+                        gameState.isPenetrate = false;
+                    }
+                }
+            }
 
-                            // 检查获胜
-                            checkWin();
+            /**
+             * 更新小球状态（位置、碰撞、分裂、存活过滤）
+             */
+            updateBalls() {
+                const { ball } = this.config;
+                const aliveBalls = [];
+                const currentBalls = [...this.balls]; // 备份当前小球，避免遍历中修改数组
+
+                currentBalls.forEach(ballObj => {
+                    // 1. 更新小球位置
+                    ballObj.x += ballObj.dx;
+                    ballObj.y += ballObj.dy;
+
+                    // 2. 边界碰撞检测（左右/上）
+                    this.handleBallBoundaryCollision(ballObj);
+
+                    // 3. 球拍碰撞检测
+                    this.handleBallPaddleCollision(ballObj);
+
+                    // 4. 砖块碰撞检测（含特效触发）
+                    const isTriggerSplit = this.handleBallBrickCollision(ballObj);
+
+                    // 5. 过滤存活小球（未落地）
+                    if (ballObj.y + ballObj.radius <= this.canvasHeight) {
+                        aliveBalls.push(ballObj);
+                        // 6. 触发小球分裂（直接加入存活数组，避免被过滤）
+                        if (isTriggerSplit) {
+                            this.generateSplitBalls(ballObj, aliveBalls);
                         }
                     }
                 });
 
-                // 8. 判断小球是否未落地：未落地则加入存活数组
-                if (ball.y + ball.radius <= canvas.height) {
-                    aliveBalls.push(ball);
+                // 7. 更新小球数组为存活小球
+                this.balls = aliveBalls;
+
+                // 8. 检查游戏结束（所有小球落地）
+                if (this.balls.length === 0) {
+                    this.gameState.isOver = true;
                 }
-            });
-
-            // 9. 更新小球数组为存活小球
-            balls = aliveBalls;
-
-            // 10. 所有小球落地才判定游戏结束
-            if (balls.length === 0) {
-                GAME_CONFIG.gameState.isOver = true;
             }
-        }
 
-        // 触发功能砖块效果（无加速功能，简洁）
-        function triggerFunctionBrickEffect(functionType) {
-            const PADDLE_BIG_RATIO = 1.5;
-            const BIG_PADDLE_DURATION = 5000;
-            const PENETRATE_DURATION = 3000;
+            /**
+             * 小球边界碰撞处理
+             * @param {object} ballObj 小球对象
+             */
+            handleBallBoundaryCollision(ballObj) {
+                // 左右边界
+                if (ballObj.x - ballObj.radius <= 0 || ballObj.x + ballObj.radius >= this.canvasWidth) {
+                    ballObj.dx = -ballObj.dx;
+                    // 限制小球不出边界（避免卡顿）
+                    ballObj.x = this.clamp(ballObj.x, ballObj.radius, this.canvasWidth - ballObj.radius);
+                }
 
-            switch (functionType) {
-                case 'bigPaddle':
-                    paddle.width = GAME_CONFIG.paddle.originalWidth * PADDLE_BIG_RATIO;
-                    GAME_CONFIG.gameState.bigPaddleTimer = BIG_PADDLE_DURATION;
-                    break;
-                case 'penetrate':
-                    GAME_CONFIG.gameState.isPenetrate = true;
-                    GAME_CONFIG.gameState.penetrateTimer = PENETRATE_DURATION;
-                    break;
-                case 'reset':
-                    paddle.width = GAME_CONFIG.paddle.originalWidth;
-                    initBalls();
-                    GAME_CONFIG.gameState.isPenetrate = false;
-                    GAME_CONFIG.gameState.bigPaddleTimer = 0;
-                    GAME_CONFIG.gameState.penetrateTimer = 0;
-                    break;
-                case 'multiBall':
-                    if (balls.length === 0) return;
-                    const baseBall = balls[0];
-                    const extraCount = GAME_CONFIG.ball.multiCount;
+                // 上边界
+                if (ballObj.y - ballObj.radius <= 0) {
+                    ballObj.dy = -ballObj.dy;
+                    ballObj.y = ballObj.radius;
+                }
+            }
 
-                    for (let i = 0; i < extraCount; i++) {
-                        const newBall = {
-                            x: baseBall.x + (i * 20 - extraCount * 10),
-                            y: baseBall.y - 15,
-                            radius: baseBall.radius,
-                            dx: baseBall.dx + (i % 2 === 0 ? 2 : -2),
-                            dy: baseBall.dy - (Math.random() * 1.5),
-                            color: baseBall.color
-                        };
+            /**
+             * 小球-球拍碰撞处理
+             * @param {object} ballObj 小球对象
+             */
+            handleBallPaddleCollision(ballObj) {
+                const { paddle } = this;
+                const { ball } = this.config;
 
-                        newBall.dx = Math.max(-GAME_CONFIG.ball.maxDX, Math.min(newBall.dx, GAME_CONFIG.ball.maxDX));
-                        balls.push(newBall);
+                // 碰撞检测（轴对齐包围盒）
+                if (
+                    ballObj.y + ballObj.radius >= paddle.y &&
+                    ballObj.x >= paddle.x - ballObj.radius &&
+                    ballObj.x <= paddle.x + paddle.width + ballObj.radius
+                ) {
+                    // 计算碰撞偏移量，调整小球横向速度
+                    const hitOffset = (ballObj.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+                    ballObj.dx = this.clamp(hitOffset * 6, -ball.maxDX, ball.maxDX);
+                    ballObj.dy = -Math.abs(ballObj.dy); // 确保小球向上反弹
+                    ballObj.y = paddle.y - ballObj.radius; // 避免小球卡入球拍
+                }
+            }
+
+            /**
+             * 小球-砖块碰撞处理
+             * @param {object} ballObj 小球对象
+             * @returns 是否触发小球分裂
+             */
+            handleBallBrickCollision(ballObj) {
+                let isTriggerSplit = false;
+                const { gameState, config, effect } = this;
+
+                this.bricks.forEach(brick => {
+                    if (!brick.isAlive) return;
+
+                    // 碰撞检测（轴对齐包围盒）
+                    const isCollide = (
+                        ballObj.y - ballObj.radius <= brick.y + brick.height &&
+                        ballObj.y + ballObj.radius >= brick.y &&
+                        ballObj.x >= brick.x - ballObj.radius &&
+                        ballObj.x <= brick.x + brick.width + ballObj.radius
+                    );
+
+                    if (isCollide) {
+                        // 1. 标记砖块为销毁
+                        brick.isAlive = false;
+
+                        // 2. 触发对应特效
+                        this.triggerBrickEffect(brick.type);
+                        if (brick.type === 'split') {
+                            isTriggerSplit = true;
+                        }
+
+                        // 3. 非穿透模式，小球反弹
+                        if (!gameState.isPenetrate) {
+                            ballObj.dy = -ballObj.dy;
+                        }
                     }
-                    break;
+                });
+
+                return isTriggerSplit;
             }
-        }
 
-        // 更新功能效果倒计时
-        function updateFunctionTimers() {
-            const deltaTime = 16;
+            /**
+             * 触发砖块对应特效（修改大球拍逻辑：设置目标宽度触发变长过渡）
+             * @param {string} brickType 砖块类型
+             */
+            triggerBrickEffect(brickType) {
+                const { gameState, config } = this;
+                const { bigPaddleScale, bigPaddleDuration, penetrateDuration } = config.effect;
 
-            if (GAME_CONFIG.gameState.bigPaddleTimer > 0) {
-                GAME_CONFIG.gameState.bigPaddleTimer -= deltaTime;
-                if (GAME_CONFIG.gameState.bigPaddleTimer <= 0) {
-                    paddle.width = GAME_CONFIG.paddle.originalWidth;
-                    GAME_CONFIG.gameState.bigPaddleTimer = 0;
+                switch (brickType) {
+                    case 'bigPaddle':
+                        // 触发大球拍：设置目标宽度为原始宽度*缩放比，触发变长过渡
+                        this.paddle.targetWidth = this.paddle.originalWidth * bigPaddleScale;
+                        gameState.bigPaddleTimer = bigPaddleDuration;
+                        break;
+                    case 'penetrate':
+                        gameState.isPenetrate = true;
+                        gameState.penetrateTimer = penetrateDuration;
+                        break;
+                    case 'reset':
+                        // 重置球拍：直接恢复原始宽度和目标宽度，无过渡（重置特效需即时生效）
+                        this.paddle.width = this.paddle.originalWidth;
+                        this.paddle.targetWidth = this.paddle.originalWidth;
+                        this.initBalls(); // 重置为1个小球
+                        gameState.isPenetrate = false;
+                        gameState.bigPaddleTimer = 0;
+                        gameState.penetrateTimer = 0;
+                        break;
                 }
             }
 
-            if (GAME_CONFIG.gameState.penetrateTimer > 0) {
-                GAME_CONFIG.gameState.penetrateTimer -= deltaTime;
-                if (GAME_CONFIG.gameState.penetrateTimer <= 0) {
-                    GAME_CONFIG.gameState.isPenetrate = false;
-                    GAME_CONFIG.gameState.penetrateTimer = 0;
+            /**
+             * 生成分裂小球
+             * @param {object} baseBall 基础小球（触发分裂的小球）
+             * @param {array} targetArray 存活小球数组（用于存放新生成的小球）
+             */
+            generateSplitBalls(baseBall, targetArray) {
+                const { splitCount, maxDX } = this.config.ball;
+
+                for (let i = 0; i < splitCount; i++) {
+                    const newBall = {
+                        x: baseBall.x + (i * 30 - splitCount * 15),
+                        y: baseBall.y - 50,
+                        radius: baseBall.radius,
+                        dx: this.clamp(baseBall.dx + (i % 2 === 0 ? 2.5 : -2.5), -maxDX, maxDX),
+                        dy: baseBall.dy - (Math.random() * 2),
+                        color: baseBall.color,
+                    };
+                    targetArray.push(newBall);
                 }
             }
-        }
 
-        function checkWin() {
-            const allBricksDestroyed = bricks.every(brick => !brick.isAlive);
-            if (allBricksDestroyed) {
-                GAME_CONFIG.gameState.isWin = true;
+            /**
+             * 检查获胜条件（所有砖块被销毁）
+             */
+            checkWinCondition() {
+                const allBricksDestroyed = this.bricks.every(brick => !brick.isAlive);
+                if (allBricksDestroyed) {
+                    this.gameState.isWin = true;
+                }
+            }
+
+            // ---------------------- 绘制相关方法 ----------------------
+            /**
+             * 游戏画面绘制（每一帧）
+             */
+            render() {
+                // 1. 清空画布
+                this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+                // 2. 绘制各个游戏对象
+                this.renderPaddle();
+                this.renderBalls();
+                this.renderBricks();
+                this.renderGameTips();
+                this.renderEffectTips();
+            }
+
+            /**
+             * 绘制球拍
+             */
+            renderPaddle() {
+                const { paddle } = this;
+                this.ctx.fillStyle = paddle.color;
+                this.ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+                this.ctx.strokeStyle = '#c0392b';
+                this.ctx.strokeRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            }
+
+            /**
+             * 绘制小球
+             */
+            renderBalls() {
+                const { isPenetrate } = this.gameState;
+                this.balls.forEach(ballObj => {
+                    this.ctx.beginPath();
+                    this.ctx.arc(ballObj.x, ballObj.y, ballObj.radius, 0, Math.PI * 2);
+                    this.ctx.fillStyle = ballObj.color;
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = isPenetrate ? '#ff66cc' : '#2980b9';
+                    this.ctx.stroke();
+                });
+            }
+
+            /**
+             * 绘制砖块
+             */
+            renderBricks() {
+                this.bricks.forEach(brick => {
+                    if (!brick.isAlive) return;
+
+                    // 绘制砖块主体
+                    this.ctx.fillStyle = brick.color;
+                    this.ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+
+                    // 绘制砖块描边（区分分裂砖块和普通功能砖块）
+                    this.renderBrickStroke(brick);
+                });
+            }
+
+            /**
+             * 绘制砖块描边（强化辨识度）
+             * @param {object} brick 砖块对象
+             */
+            renderBrickStroke(brick) {
+                if (brick.isSplitBrick) {
+                    // 分裂砖块：白色粗描边 + 内部浅紫小点
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
+
+                    this.ctx.fillStyle = '#e6ccff';
+                    this.ctx.beginPath();
+                    this.ctx.arc(brick.x + 20, brick.y + 7, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                } else if (brick.type !== 'normal') {
+                    // 其他功能砖块：黑色细描边
+                    this.ctx.strokeStyle = '#000000';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
+                } else {
+                    // 普通砖块：深绿细描边
+                    this.ctx.strokeStyle = '#1e8449';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
+                }
+
+                // 恢复默认线宽
+                this.ctx.lineWidth = 1;
+            }
+
+            /**
+             * 绘制游戏结束/获胜提示
+             */
+            renderGameTips() {
+                this.ctx.font = '28px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillStyle = '#2c3e50';
+
+                if (this.gameState.isOver) {
+                    this.ctx.fillText('游戏结束 | 点击画布重开', this.canvasWidth / 2, this.canvasHeight / 2);
+                } else if (this.gameState.isWin) {
+                    this.ctx.fillText('恭喜获胜 | 点击画布重开', this.canvasWidth / 2, this.canvasHeight / 2);
+                }
+            }
+
+            /**
+             * 绘制特效倒计时和小球数量提示
+             */
+            renderEffectTips() {
+                this.ctx.font = '16px Arial';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillStyle = '#2c3e50';
+                let tipY = 25;
+
+                // 大球拍提示
+                if (this.gameState.bigPaddleTimer > 0) {
+                    const remaining = (this.gameState.bigPaddleTimer / 1000).toFixed(1);
+                    this.ctx.fillText(`大球拍：${remaining}s`, 10, tipY);
+                    tipY += 20;
+                }
+
+                // 穿透提示
+                if (this.gameState.penetrateTimer > 0) {
+                    const remaining = (this.gameState.penetrateTimer / 1000).toFixed(1);
+                    this.ctx.fillText(`穿透：${remaining}s`, 10, tipY);
+                    tipY += 20;
+                }
+
+                // 小球数量提示（与分裂砖块同色，加粗）
+                this.ctx.font = '16px Arial bold';
+                this.ctx.fillStyle = '#9933ff';
+                this.ctx.fillText(`剩余小球：${this.balls.length}`, 10, tipY);
+            }
+
+            // ---------------------- 游戏循环与重置 ----------------------
+            /**
+             * 游戏主循环（requestAnimationFrame 实现流畅帧动画）
+             */
+            gameLoop() {
+                this.update();
+                this.render();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+
+            /**
+             * 重置游戏（恢复初始状态，同步重置球拍过渡属性）
+             */
+            resetGame() {
+                this.gameState.isOver = false;
+                this.gameState.isWin = false;
+                this.gameState.isPenetrate = false;
+                this.gameState.bigPaddleTimer = 0;
+                this.gameState.penetrateTimer = 0;
+
+                this.initPaddle(); // 重置球拍（包含targetWidth）
+                this.initBalls();
+                this.initBricks();
             }
         }
-
-        function gameLoop(timestamp) {
-            update(timestamp);
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        // 重置游戏
-        function resetGame() {
-            paddle.x = canvas.width / 2 - GAME_CONFIG.paddle.originalWidth / 2;
-            paddle.width = GAME_CONFIG.paddle.originalWidth;
-            paddle.dx = 0;
-
-            initBalls();
-            initBricks();
-
-            GAME_CONFIG.gameState.isOver = false;
-            GAME_CONFIG.gameState.isWin = false;
-            GAME_CONFIG.gameState.isPenetrate = false;
-            GAME_CONFIG.gameState.bigPaddleTimer = 0;
-            GAME_CONFIG.gameState.penetrateTimer = 0;
-        }
-
-        // 鼠标移动控制球拍
-        canvas.addEventListener('mousemove', (e) => {
-            if (GAME_CONFIG.gameState.isOver || GAME_CONFIG.gameState.isWin) {
-                return;
-            }
-            const rect = canvas.getBoundingClientRect();
-            paddle.x = e.clientX - rect.left - paddle.width / 2;
-        });
-
-        // 点击画布重置游戏
-        canvas.addEventListener('click', () => {
-            if (GAME_CONFIG.gameState.isOver || GAME_CONFIG.gameState.isWin) {
-                resetGame();
-            }
-        });
-
-        // 挂载全局变量
-        window.canvas = canvas;
-        window.paddle = paddle;
-        window.balls = balls;
-        window.GAME_CONFIG = GAME_CONFIG;
 
         // 启动游戏
-        gameLoop();
+        window.onload = () => new BreakoutGame('gameCanvas');
     </script>
 </body>
 </html>
